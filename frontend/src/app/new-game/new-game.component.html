@@ -1,0 +1,24 @@
+<div class="center">
+  <section>
+    <h1>
+      Создать игру <span *ngIf="gameName">"{{gameName}}"</span>
+    </h1>
+    <h3>
+      (шоб присоединица, пусть вам кто-то шлёт <b>ССЫЛКУ</b>)
+    </h3>
+
+    <div class="form">
+      <div>
+        <label>Название игры: <input #name type="text" [(ngModel)]="gameName" autofocus></label>
+      </div>
+      <div>
+        <label>Продолжительность раунда: <input #length type="number" [(ngModel)]="roundLength"></label>
+      </div>
+      <div>
+        <label>Количество слов на игрока: <input #words type="number" [(ngModel)]="hatWordsPerUser"></label>
+      </div>
+      <div class="red">{{formError}}&nbsp;</div>
+      <button type="submit" (click)="submitForm()">Создать</button>
+    </div>
+  </section>
+</div>

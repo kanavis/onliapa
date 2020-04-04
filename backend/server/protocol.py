@@ -1,9 +1,10 @@
+import functools
 import json
 import logging
 from typing import Type, Optional, Union, TypeVar, Tuple
 
-from marshmallow import ValidationError
-from websockets import WebSocketServerProtocol, ConnectionClosed
+from marshmallow import ValidationError, Schema
+from websockets import WebSocketServerProtocol
 
 from server.errors import BaseError, ProtocolError, RemoteError
 
@@ -48,9 +49,20 @@ class DecodeError(BaseError):
     pass
 
 
+async def recv_d(
+        websocket: WebSocketServerProtocol,
+        expected: Type[T],
+        expected_tag: str,
+):
+    _, res = await recv(websocket, expected, expected_tag)
+    assert isinstance(res, expected.t)
+    return res
+
+
 async def recv(
         websocket: WebSocketServerProtocol,
         expected: Optional[Type[T]] = None,
+        expected_tag: str = None,
 ) -> Tuple[str, Union[T, dict, str]]:
     data = await websocket.recv()
     try:
@@ -61,6 +73,9 @@ async def recv(
         if 'tag' not in decoded_json:
             raise DecodeError('No tag field')
         tag = decoded_json['tag']
+        if expected_tag is not None:
+            if tag != expected_tag:
+                raise DecodeError(f'Unexpected tag: {tag} != e {expected_tag}')
         if 'message' in decoded_json:
             message = decoded_json['message']
         elif 'error' in decoded_json:
@@ -73,7 +88,7 @@ async def recv(
             try:
                 decoded = expected(**message)
             except (TypeError, ValueError, ValidationError) as err:
-                raise DecodeError(err)
+                raise DecodeError(f'{expected}: {err}')
             return tag, decoded
         else:
             if not isinstance(message, (dict, str)):
@@ -88,13 +103,22 @@ async def recv(
         raise ProtocolError(err, data)
 
 
-def message_type(outer):
-    def inner(**kwargs):
-        if hasattr(outer, 'Schema'):
-            schema = getattr(outer, 'Schema')
-            data = schema.load(**kwargs)
+class MessageType:
+    def __init__(self, t):
+        self.t = t
+        self.name = t.__name__
+
+    def __call__(self, **kwargs):
+        if hasattr(self.t, 'Schema'):
+            schema: Schema = getattr(self.t, 'Schema')()
+            data = schema.load(kwargs)
         else:
             data = kwargs
-        return outer(**data)
+        return self.t(**data)
 
-    return inner
+    def __str__(self):
+        return self.name
+
+
+def message_type(outer):
+    return MessageType(outer)

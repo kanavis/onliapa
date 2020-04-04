@@ -1,0 +1,63 @@
+html, body, input {
+  font-size: 16px;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+}
+
+main {
+  margin: 0 auto;
+  width: 1000px;
+}
+
+header {
+  height: 180px;
+  margin-bottom: 20px;
+  border: 1px solid black;
+  display: flex;
+  justify-content: flex-start;
+}
+header section.img img {
+  height: 180px;
+}
+header section.text {
+  margin-left: 20px;
+  display: flex;
+  align-items: center;
+  font-size: 4em;
+}
+
+h1, h2, h3, h4 {
+  display: block;
+}
+h3 {
+  font-size: 1.1em;
+}
+h2 {
+  font-size: 1.4em;
+  margin-bottom: 5px;
+}
+h1 {
+  font-size: 2em;
+  margin-bottom: 10px;
+}
+
+div.center {
+  display: flex;
+  justify-content: center;
+}
+div.red {
+  color: red;
+}
+
+
+div.form > div {
+  margin-bottom: 20px;
+}
+div.form > div > label {
+  display: flex;
+  justify-content: end;
+  width: 600px;
+}
+div.form > div > label > input {
+  width: 300px;
+  margin-left: 20px;
+}

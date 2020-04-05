@@ -1,0 +1,20 @@
+<div class="margin">
+  <div class="margin">
+    <b>
+      Игра "{{state.game_info.game_name}}"
+    </b>
+    <small>
+      <a target="_new" [routerLink]="">{{gameHref}}</a> &nbsp;
+      <button (click)="toClipboard(gameHref)">Копировать</button>
+    </small>
+  </div>
+</div>
+<div class="margin">
+    <small><b>Длина раунда: </b>{{state.game_info.round_length}}</small>
+</div>
+<div class="margin">
+    <small><b>Слов на игрока: </b>{{state.game_info.hat_words_per_user}}</small>
+</div>
+<div class="margin">
+    <b>Статус: </b>{{readableStateName}} ({{state.state_name}})
+</div>

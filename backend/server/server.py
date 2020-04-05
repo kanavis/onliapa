@@ -37,7 +37,7 @@ async def serve_game(ws: WebSocketServerProtocol, game_id: str, admin: bool):
         room = rooms[game_id]
     except KeyError:
         log.info(f'{ip} is trying to join non-existent game {game_id}')
-        await ws.send(rerr('wrong-game'))
+        await ws.send(rerr('wrong-game', 'Wrong game'))
         await ws.close()
         return
     if admin:
@@ -74,18 +74,20 @@ async def create_game(ws: WebSocketServerProtocol):
 
 
 async def _serve(ws: WebSocketServerProtocol, path: str):
+    ip = ':'.join(map(str, ws.remote_address))
     if RE_GAME_PATH.match(path):
         game_id = RE_GAME_PATH.matches.group(1)
-        log.info(f'New connection from {ws.remote_address} to game {game_id}')
+        log.info(f'New connection from {ip} to game {game_id}')
         await serve_game(ws, game_id, False)
     elif RE_ADMIN_PATH.match(path):
-        game_id = RE_GAME_PATH.matches.group(1)
-        log.info(f'New admin conn from {ws.remote_address} to game {game_id}')
+        game_id = RE_ADMIN_PATH.matches.group(1)
+        log.info(f'New admin connection from {ip} to game {game_id}')
         await serve_game(ws, game_id, True)
     elif RE_NEW_GAME_PATH.match(path):
-        log.info(f'New game request from {ws.remote_address}')
+        log.info(f'New game session connection from {ip}')
         await create_game(ws)
     else:
+        await ws.send(rerr('wrong-path', 'Wrong path'))
         await ws.close(1002, f'Wrong path {path}')
 
 
@@ -98,6 +100,7 @@ async def serve(ws: WebSocketServerProtocol, path: str):
     except ProtocolError as err:
         log.info(f'Host {ip}: protocol error: {err}')
         try:
+            await ws.send(rerr('protocol-error', 'Protocol error'))
             await ws.close(1002, f'protocol error')
         except Exception as err:
             log.debug(f'Host {ip}: Error closing failed socket: {err}')

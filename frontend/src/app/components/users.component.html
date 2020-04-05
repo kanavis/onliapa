@@ -1,0 +1,30 @@
+ <h3>Хуигроки:</h3>
+
+<span *ngIf="state.users.length === 0">Нихера тут пусто</span>
+<table>
+  <tr *ngFor="let user of sortedUsers; let i = index;">
+    <td>{{i + 1}}. </td>
+    <td>{{user.user_name}}</td>
+    <td><b>{{user.score}}</b></td>
+    <td *ngIf="admin && unlocked">
+      <button *ngIf="userIdFrom === undefined" (click)="setUserFrom(user)">Обяъсняй!</button>
+      <button
+        *ngIf="userIdFrom !== undefined && userIdFrom != user.user_id && userIdTo === undefined"
+        (click)="setUserTo(user)">Понимай!</button>
+      <span *ngIf="userIdFrom !== undefined && userIdFrom == user.user_id">объясняет</span>
+      <span *ngIf="userIdTo !== undefined && userIdTo == user.user_id">понимает</span>
+    </td>
+  </tr>
+</table>
+<div *ngIf="admin && unlocked">&nbsp;
+  <div *ngIf="userNameFrom">
+    Объяснять будет: {{userNameFrom}}
+    <div *ngIf="userNameTo">
+      Понимать будет: {{ userNameTo }}
+    </div>
+    <div>
+      <button (click)="resetUserId()">НЕТ!</button>&nbsp;
+      <button (click)="emitRound()" *ngIf="userNameTo">ПОЕХАЛИ!</button>
+    </div>
+  </div>
+</div>

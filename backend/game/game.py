@@ -3,7 +3,7 @@ import logging
 import random
 import time
 from collections import defaultdict
-from typing import Set, Dict, Union
+from typing import Set, Dict, Union, Optional, List
 
 from websockets import WebSocketServerProtocol
 
@@ -53,7 +53,7 @@ class Timer:
         return self.length - time.time() + self.start
 
 
-class State:
+class UserState:
     name = 'unknown'
 
     def to_message(self):
@@ -63,14 +63,14 @@ class State:
         return self.name
 
 
-class UserStateStandby(State):
+class UserStateStandby(UserState):
     name = 'standby'
 
     def to_message(self):
         return msg.Empty()
 
 
-class UserStateAsking(State):
+class UserStateAsking(UserState):
     name = 'asking'
 
     def __init__(self, timer: Timer, word: str, other: 'GameUser'):
@@ -86,7 +86,7 @@ class UserStateAsking(State):
         )
 
 
-class UserStateAnswering(State):
+class UserStateAnswering(UserState):
     name = 'answering'
 
     def __init__(self, timer: Timer, other: 'GameUser'):
@@ -130,9 +130,19 @@ class GameUser:
         )
 
 
-class HatFillState(State):
+class GameState:
+    name = 'unknown'
+
+    def to_message(self):
+        raise NotImplementedError()
+
+    def __str__(self):
+        return self.name
+
+
+class HatFillState(GameState):
     """ Filling the hat with words """
-    name = 'hand_fill'
+    name = 'hat_fill'
     words_per_user: Dict[int, int]
     users: Set[int]
 
@@ -141,18 +151,18 @@ class HatFillState(State):
         self.users = set()
 
     def to_message(self):
-        return msg.Empty()
+        return {'state_hat_fill': msg.StateHatFill(users=list(self.users))}
 
 
-class GameStandbyState(State):
+class GameStandbyState(GameState):
     """ Game is on standby """
     name = 'standby'
 
     def to_message(self):
-        return msg.Empty()
+        pass
 
 
-class RoundState(State):
+class RoundState(GameState):
     """ Pair is playing a round state """
     name = 'round'
 
@@ -160,6 +170,7 @@ class RoundState(State):
     user_to: GameUser
     word: str
     timer: Timer
+    guessed_words: List[str]
 
     def __init__(self, user_from: GameUser, user_to: GameUser, word: str,
                  timer: Timer):
@@ -167,9 +178,16 @@ class RoundState(State):
         self.user_to = user_to
         self.word = word
         self.timer = timer
+        self.guessed_words = []
 
     def to_message(self):
-        return msg.Empty()
+        return {
+            'state_round': msg.StateRound(
+                asking=self.user_from.to_message(),
+                answering=self.user_to.to_message(),
+                time_left=int(self.timer.time_left),
+            ),
+        }
 
 
 game_handler = EventHandler()
@@ -219,15 +237,38 @@ class Game:
         message = rmsg('user-state', {'name': state_name, 'data': state_msg})
         return await self.room.user_send(user.user.user_id, message)
 
-    async def _broadcast_game_state(self, reason=None, appendix=None):
-        name = self.state.name
-        data = self.state.to_message()
-        message = rmsg(
-            'game-state',
-            {'name': name, 'reason': reason,
-             'appendix': appendix, 'data': data}
+    def to_message(self) -> msg.GameInfo:
+        return msg.GameInfo(
+            game_id=self.game_id,
+            game_name=self.game_name,
+            round_length=self.round_length,
+            hat_words_per_user=self.hat_words_per_user,
         )
+
+    def _game_state_msg(self, reason, appendix) -> str:
+        state_dict = dict(
+            state_name=self.state.name,
+            users=list(u.to_message() for u in self.users.values()),
+            reason=reason,
+            appendix=appendix,
+            state_hat_fill=None,
+            state_round=None,
+            game_info=self.to_message(),
+        )
+        state_dict.update(self.state.to_message())
+        return rmsg('game-state', msg.GameState(**state_dict))
+
+    async def _broadcast_game_state(self, reason=None, appendix=None):
+        message = self._game_state_msg(reason=reason, appendix=appendix)
         await self.room.broadcast(message)
+
+    async def _send_game_state(self, user: Optional[GameUser],
+                               reason=None, appendix=None):
+        message = self._game_state_msg(reason=reason, appendix=appendix)
+        if user is None:
+            await self.room.admin_send(message)
+        else:
+            await self.room.user_send(user.user.user_id, message)
 
     @game_handler.handler('join')
     async def event_join(self, user: User):
@@ -240,6 +281,15 @@ class Game:
             # Broadcast user joined game
             message = game_user.to_message()
             await self.room.broadcast(rmsg('new-user', message))
+        else:
+            game_user = self.users[user.user_id]
+        # Send user and game state to user
+        await self._send_user_state(game_user)
+        await self._send_game_state(game_user, 'connect')
+
+    @game_handler.handler('admin-join')
+    async def event_admin_join(self, _):
+        await self._send_game_state(None, 'connect')
 
     @game_handler.message_handler('hat-add-words', msg.HatAddWords)
     async def msg_hat_add_words(self, message: msg.HatAddWords, user: User,
@@ -381,6 +431,7 @@ class Game:
 
         # Update word
         self.hat.remove(self.state.word)
+        self.state.guessed_words.append(self.state.word)
         self.state.word = self.hat.get()
         self.state.user_from.state.word = self.state.word
         await self._send_user_state(self.state.user_from)

@@ -1,4 +1,4 @@
-from typing import NamedTuple, List
+from typing import NamedTuple, List, Union, Any, Optional
 from marshmallow import Schema, fields, validate
 from server.protocol import message_type
 
@@ -49,6 +49,12 @@ class HatAddWords(NamedTuple):
 
 
 @message_type
+class AuthUser(NamedTuple):
+    user_name: str
+    user_id: int
+
+
+@message_type
 class User(NamedTuple):
     user_name: str
     user_id: int
@@ -88,6 +94,14 @@ class GuessedWord(NamedTuple):
 
 
 @message_type
+class GameInfo(NamedTuple):
+    game_id: str
+    game_name: str
+    round_length: int
+    hat_words_per_user: int
+
+
+@message_type
 class UserStateAsking(NamedTuple):
     time_left: int
     word: str
@@ -101,7 +115,23 @@ class UserStateAnswering(NamedTuple):
 
 
 @message_type
+class StateHatFill(NamedTuple):
+    users: List[int]
+
+
+@message_type
 class StateRound(NamedTuple):
     time_left: int
     asking: User
     answering: User
+
+
+@message_type
+class GameState(NamedTuple):
+    game_info: GameInfo
+    state_name: str
+    state_hat_fill: Optional[StateHatFill]
+    state_round: Optional[StateRound]
+    users: List[User]
+    reason: Optional[str]
+    appendix: Any

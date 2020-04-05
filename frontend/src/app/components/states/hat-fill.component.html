@@ -1,0 +1,15 @@
+<h3>
+Наполнение шляпы
+</h3>
+<table>
+  <tr *ngFor="let user of state.users">
+    <td>
+      {{user.user_name}}
+    </td>
+    <td>
+      <b>
+        <span *ngIf="state.state_hat_fill.users.indexOf(user.user_id) === -1">тупит</span>
+      </b>
+    </td>
+  <tr>
+</table>

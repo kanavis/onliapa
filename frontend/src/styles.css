@@ -1,4 +1,4 @@
-html, body, input {
+html, body, input, button, textarea {
   font-size: 16px;
   font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
 }
@@ -25,39 +25,90 @@ header section.text {
   font-size: 4em;
 }
 
+small {
+  font-size: 0.8em;
+}
+small input, small button, small textarea {
+  font-size: 0.8em;
+}
+mark {
+  background-color: rgb(255, 220, 195);
+}
+
+
+a {
+  color: black;
+}
+
 h1, h2, h3, h4 {
   display: block;
+  margin-top: 0px;
 }
 h3 {
   font-size: 1.1em;
+  margin-bottom: 10px;
 }
 h2 {
   font-size: 1.4em;
-  margin-bottom: 5px;
+  margin-bottom: 10px;
 }
 h1 {
   font-size: 2em;
-  margin-bottom: 10px;
+  margin-bottom: 20px;
 }
 
+.bordered {
+  border: 1px solid black;
+  padding: 10px;
+  margin-bottom: 10px;
+  margin-right: 10px;
+}
+.third {
+  width: 31%;
+}
+.medium {
+  width: 40%;
+}
+.half {
+  width: 48%;
+}
 div.center {
   display: flex;
   justify-content: center;
 }
-div.red {
+.red {
   color: red;
 }
 
+table {
+  border-collapse:separate;
+  border-spacing: 10px 10px;
+}
+
+.margin {
+  margin-bottom: 10px;
+  margin-right: 10px;
+}
 
 div.form > div {
   margin-bottom: 20px;
 }
 div.form > div > label {
   display: flex;
-  justify-content: end;
+  justify-content: flex-end;
   width: 600px;
 }
 div.form > div > label > input {
   width: 300px;
   margin-left: 20px;
+}
+
+.flex {
+  display: flex;
+  flex-direction: column;
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  flex-direction: row;
 }

@@ -1,0 +1,33 @@
+<h3>Админка игры</h3>
+
+<div *ngIf="globalError" class="red">
+  <h1 class="red">{{globalError}}</h1>
+</div>
+
+<div *ngIf="init" class="flex">
+
+  <div class="row">
+
+    <div class="bordered">
+      <app-state [state]="state"></app-state>
+    </div>
+
+  </div>
+
+  <div class="row">
+
+    <div class="bordered half">
+      <app-users
+        *ngIf="state !== undefined" [state]="state"
+        (runPair)="runPair($event)" [admin]="true" [unlocked]="state.state_name == 'standby'"></app-users>
+    </div>
+
+    <div class="bordered half">
+      <app-hat-fill *ngIf="state.state_hat_fill" [state]="state"></app-hat-fill>
+      <app-round *ngIf="state.state_round" [state]="state"></app-round>
+      <b *ngIf="state.state_name === 'standby'">Тупим</b>
+    </div>
+
+  </div>
+
+</div>

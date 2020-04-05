@@ -8,7 +8,7 @@ export interface WebSocketConfig {
 
 export interface IWsMessage<T> {
   tag: string;
-  error: string;
+  error?: string;
   message: T;
 }
 

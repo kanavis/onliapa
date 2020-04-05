@@ -1,4 +1,3 @@
-import functools
 import json
 import logging
 from typing import Type, Optional, Union, TypeVar, Tuple
@@ -12,25 +11,26 @@ T = TypeVar('T')
 log = logging.getLogger('onliapa.server.protocol')
 
 
-class ProtocolEncoder(json.JSONEncoder):
-    def _iterencode(self, obj, markers=None):
-        if isinstance(obj, tuple) and hasattr(obj, '_asdict'):
-            gen = self._iterencode_dict(obj._asdict(), markers)
-        else:
-            gen = json.JSONEncoder._iterencode(self, obj, markers)
-        for chunk in gen:
-            yield chunk
-
-
-encoder = ProtocolEncoder()
+def transcode(value, _level=0):
+    if _level > 100:
+        raise RecursionError(f'Level {_level} reached with {value}')
+    _level += 1
+    if isinstance(value, tuple) and hasattr(value, '_asdict'):
+        return transcode(getattr(value, '_asdict')(), _level)
+    if isinstance(value, dict):
+        return {k: transcode(v, _level) for k, v in value.items()}
+    elif isinstance(value, (list, tuple)):
+        return [transcode(v, _level) for v in value]
+    else:
+        return value
 
 
 def rmsg(tag, message) -> str:
-    return encoder.encode({'tag': tag, 'message': message})
+    return json.dumps({'tag': tag, 'message': transcode(message)})
 
 
 def rerr(tag, message='', data=None) -> str:
-    return encoder.encode(
+    return json.dumps(
         {
             'tag': tag,
             'error': message,

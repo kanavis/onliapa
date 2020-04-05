@@ -1,26 +1,44 @@
-import { Component, ViewChild, ElementRef, OnInit } from '@angular/core';
+import { Component, ViewChild, ElementRef, OnInit, OnDestroy } from '@angular/core';
 import { WebSocketService } from '../services/ws/websocket.service';
 import { environment } from 'src/environments/environment';
 import { INewGameRequest } from './interfaces';
+import { NavigationStart, NavigationEnd, Router } from '@angular/router';
+import { Subscription } from 'rxjs';
 
 @Component({
   templateUrl: './new-game.component.html',
 })
-export class NewGameComponent implements OnInit {
+export class NewGameComponent implements OnInit, OnDestroy {
   gameName = '';
   roundLength = 60;
   hatWordsPerUser = 5;
   formError = '';
 
+  private routeSub: Subscription;
+
   @ViewChild('name') nameElement: ElementRef;
   @ViewChild('length') lengthElement: ElementRef;
   @ViewChild('words') wordsElement: ElementRef;
 
-  constructor(private ws: WebSocketService) {}
+  constructor(private ws: WebSocketService, private router: Router) {}
 
   ngOnInit(): void {
-    console.log('Init create game controller');
-    this.ws.connectToUrl(environment.ws_create);
+    this.ws.on<string>('new-game-id').subscribe({
+      next: (id: string) => {
+        location.href = `/admin/${id}`;
+      }
+    });
+    this.ws.onError().subscribe({
+      next: (error) => {
+        console.error('Ws error', error);
+        alert(`Error (${error.tag}): ${error.error}`);
+      }
+    });
+    this.ws.connect(environment.ws_create);
+  }
+
+  public ngOnDestroy() {
+    this.routeSub.unsubscribe();
   }
 
   submitForm() {

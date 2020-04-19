@@ -32,7 +32,9 @@ small input, small button, small textarea {
   font-size: 0.8em;
 }
 mark {
-  background-color: rgb(255, 220, 195);
+  background-color: rgb(213, 216, 223);
+  padding-left: 2px;
+  padding-right: 2px;
 }
 
 
@@ -111,4 +113,12 @@ div.form > div > label > input {
   display: flex;
   justify-content: space-between;
   flex-direction: row;
+}
+
+div.small-form > div {
+  margin-bottom: 10px;
+}
+
+.margin-bottom {
+  margin-bottom: 10px;
 }

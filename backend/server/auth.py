@@ -1,5 +1,6 @@
 import logging
 from typing import Optional
+from zlib import adler32
 
 from websockets import WebSocketServerProtocol
 
@@ -27,6 +28,13 @@ class User:
             'name': self.name,
         }
 
+    @classmethod
+    def deserialize(cls, state: dict) -> 'User':
+        return cls(
+            id_=state['user_id'],
+            name=state['name'],
+        )
+
     def to_msg(self):
         return msg.AuthUser(user_id=self.user_id, user_name=self.name)
 
@@ -43,7 +51,8 @@ async def auth(websocket: WebSocketServerProtocol) -> Optional[User]:
         await websocket.send(rerr('auth-error', f'wrong name {user_name}'))
         return None
 
-    user = User(hash(user_name), user_name)
+    user_id = adler32(user_name.encode())
+    user = User(user_id, user_name)
     await websocket.send(rmsg('auth-ok', user.to_msg()))
     log.info(f'Connection {ip} authenticated as {user}')
 

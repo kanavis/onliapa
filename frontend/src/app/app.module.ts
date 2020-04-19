@@ -13,6 +13,9 @@ import { UsersComponent } from './components/users.component';
 import { StateComponent } from './components/state.component';
 import { HatFillComponent } from './components/states/hat-fill.component';
 import { RoundComponent } from './components/states/round-component';
+import { GameAuthComponent } from './game/game-auth.component';
+import {GamePlayComponent} from './game/game-play.component';
+import {HatWordsComponent} from './components/states/hat-words.component';
 
 @NgModule({
   declarations: [
@@ -24,6 +27,9 @@ import { RoundComponent } from './components/states/round-component';
     UsersComponent,
     HatFillComponent,
     RoundComponent,
+    GameAuthComponent,
+    GamePlayComponent,
+    HatWordsComponent,
   ],
   imports: [
     BrowserModule,

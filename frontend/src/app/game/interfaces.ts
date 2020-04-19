@@ -5,8 +5,12 @@ export interface IUser {
   score: number;
 }
 
+export interface IUserId {
+  user_id: number;
+}
+
 export interface IStateHatFill {
-  users: Array<IUser>;
+  users: Array<number>;
 }
 
 export interface IStateRound {
@@ -35,4 +39,38 @@ export interface IGameState {
 export interface IUserPair {
   user_id_from: number;
   user_id_to: number;
+}
+
+export interface IAuthUser {
+  user_name: string;
+  user_id: number;
+}
+
+export interface IAuthRequest {
+  user_name: string;
+}
+
+export interface IUserStateAsking {
+  time_left: number;
+  word: string;
+  other: IUser;
+}
+
+export interface IUserStateAnswering {
+  time_left: number;
+  other: IUser;
+}
+
+export interface IUserState {
+  state_name: string;
+  state_asking: IUserStateAsking;
+  state_answering: IUserStateAnswering;
+}
+
+export interface IHatAddWords {
+  words: Array<string>;
+}
+
+export interface IHatFillEnd {
+  ignore_not_full: boolean;
 }

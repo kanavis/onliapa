@@ -15,6 +15,14 @@ class AuthRequest(NamedTuple):
 
 
 @message_type
+class UserId(NamedTuple):
+    class Schema(Schema):
+        user_id = fields.Integer()
+
+    user_id: int
+
+
+@message_type
 class NewGameRequest(NamedTuple):
     class Schema(Schema):
         game_name = fields.String(
@@ -62,11 +70,6 @@ class User(NamedTuple):
 
 
 @message_type
-class UserPutWords(NamedTuple):
-    user_id: int
-
-
-@message_type
 class AdminStartRound(NamedTuple):
     class Schema(Schema):
         user_id_from = fields.Integer(required=True)
@@ -74,11 +77,6 @@ class AdminStartRound(NamedTuple):
 
     user_id_from: int
     user_id_to: int
-
-
-@message_type
-class StateSnapshot(NamedTuple):
-    state: str
 
 
 @message_type
@@ -135,3 +133,15 @@ class GameState(NamedTuple):
     users: List[User]
     reason: Optional[str]
     appendix: Any
+
+
+@message_type
+class UserState(NamedTuple):
+    state_name: str
+    state_asking: Optional[UserStateAsking]
+    state_answering: Optional[UserStateAnswering]
+
+
+@message_type
+class HatFillEnd(NamedTuple):
+    ignore_not_full: bool

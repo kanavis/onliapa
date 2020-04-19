@@ -3,14 +3,13 @@ import logging
 import random
 import time
 from collections import defaultdict
-from typing import Set, Dict, Union, Optional, List
+from typing import Set, Dict, Union, Optional, List, Tuple, Callable
 
 from websockets import WebSocketServerProtocol
 
-from game.helpers import state_serialize
+from game.helpers import state_serialize, state_deserialize
 from server.auth import User
 from server import messages as msg
-from server.messages import UserPutWords
 from server.protocol import rmsg, rerr
 from server.room import GameRoom, EventEmitter, EventHandler
 
@@ -42,6 +41,9 @@ class Hat:
             'words': list(self._words),
         }
 
+    def deserialize(self, state: dict):
+        self._words = set(state['words'])
+
 
 class Timer:
     def __init__(self, start: float, length: float):
@@ -67,7 +69,7 @@ class UserStateStandby(UserState):
     name = 'standby'
 
     def to_message(self):
-        return msg.Empty()
+        return {}
 
 
 class UserStateAsking(UserState):
@@ -79,11 +81,13 @@ class UserStateAsking(UserState):
         self.other = other
 
     def to_message(self):
-        return msg.UserStateAsking(
-            time_left=int(self.timer.time_left),
-            word=self.word,
-            other=self.other.to_message(),
-        )
+        return {
+            'state_asking': msg.UserStateAsking(
+                time_left=int(self.timer.time_left),
+                word=self.word,
+                other=self.other.to_message(),
+            ),
+        }
 
 
 class UserStateAnswering(UserState):
@@ -94,10 +98,12 @@ class UserStateAnswering(UserState):
         self.other = other
 
     def to_message(self):
-        return msg.UserStateAnswering(
-            time_left=int(self.timer.time_left),
-            other=self.other.to_message(),
-        )
+        return {
+            'state_answering': msg.UserStateAnswering(
+                time_left=int(self.timer.time_left),
+                other=self.other.to_message(),
+            ),
+        }
 
 
 class GameUser:
@@ -107,7 +113,7 @@ class GameUser:
 
     def __init__(self, user):
         self.user = user
-
+        self.state = UserStateStandby()
         self.score = 0
 
     def add_point(self):
@@ -121,6 +127,12 @@ class GameUser:
             'user': self.user.serialize(),
             'score': self.score,
         }
+
+    @classmethod
+    def deserialize(cls, state: dict) -> 'GameUser':
+        user = cls(user=User.deserialize(state['user']))
+        user.score = state['score']
+        return user
 
     def to_message(self) -> msg.User:
         return msg.User(
@@ -159,7 +171,7 @@ class GameStandbyState(GameState):
     name = 'standby'
 
     def to_message(self):
-        pass
+        return {}
 
 
 class RoundState(GameState):
@@ -191,6 +203,7 @@ class RoundState(GameState):
 
 
 game_handler = EventHandler()
+TState = Union[HatFillState, GameStandbyState, RoundState]
 
 
 class Game:
@@ -203,14 +216,15 @@ class Game:
     round_num: int
     hat: Hat
     users: Dict[int, GameUser]
-    state: Union[HatFillState, GameStandbyState, RoundState]
+    _state: TState
 
     def __init__(
-            self,
-            game_id: str,
-            game_name: str,
-            round_length: int,
-            hat_words_per_user: int
+        self,
+        game_id: str,
+        game_name: str,
+        round_length: int,
+        hat_words_per_user: int,
+        state_saver: Callable[[str], None],
     ):
         self.game_id = game_id
         self.game_name = game_name
@@ -223,7 +237,16 @@ class Game:
         self.round_num = 0
         self.hat = Hat()
         self.users = dict()
-        self.state = HatFillState()
+        self._state = HatFillState()
+        self._state_saver = state_saver
+
+    @property
+    def state(self) -> TState:
+        return self._state
+
+    async def _change_state(self, state: TState, reason=None, appendix=None):
+        self._state = state
+        await self._broadcast_game_state(reason=reason, appendix=None)
 
     def _info(self, message):
         log.info(f'Game {self.game_id}: {message}')
@@ -231,11 +254,19 @@ class Game:
     def _warning(self, message):
         log.warning(f'Game {self.game_id}: {message}')
 
-    async def _send_user_state(self, user: GameUser):
-        state_name = user.state.name
-        state_msg = user.state.to_message()
-        message = rmsg('user-state', {'name': state_name, 'data': state_msg})
-        return await self.room.user_send(user.user.user_id, message)
+    async def _send_user_state(
+        self,
+        user: GameUser,
+        sock: Optional[WebSocketServerProtocol] = None
+    ):
+        state_dict = dict(
+            state_name=user.state.name,
+            state_asking=None,
+            state_answering=None,
+        )
+        state_dict.update(user.state.to_message())
+        message = rmsg('user-state', msg.UserState(**state_dict))
+        return await self.room.user_send(user.user.user_id, message, sock=sock)
 
     def to_message(self) -> msg.GameInfo:
         return msg.GameInfo(
@@ -262,21 +293,27 @@ class Game:
         message = self._game_state_msg(reason=reason, appendix=appendix)
         await self.room.broadcast(message)
 
-    async def _send_game_state(self, user: Optional[GameUser],
-                               reason=None, appendix=None):
+    async def _send_game_state(
+            self,
+            user: Optional[GameUser],
+            reason=None,
+            appendix=None,
+            sock: Optional[WebSocketServerProtocol] = None
+    ):
         message = self._game_state_msg(reason=reason, appendix=appendix)
         if user is None:
-            await self.room.admin_send(message)
+            await self.room.admin_send(message, sock=sock)
         else:
-            await self.room.user_send(user.user.user_id, message)
+            await self.room.user_send(user.user.user_id, message, sock=sock)
 
     @game_handler.handler('join')
-    async def event_join(self, user: User):
+    async def event_join(self, data: Tuple[User, WebSocketServerProtocol]):
+        user, sock = data
         if user.user_id not in self.users:
             # Create new game user
             game_user = GameUser(user)
             self.users[user.user_id] = game_user
-            self._info(f'User {game_user} joined')
+            self._info(f'User {game_user} {user.user_id} joined')
 
             # Broadcast user joined game
             message = game_user.to_message()
@@ -284,12 +321,89 @@ class Game:
         else:
             game_user = self.users[user.user_id]
         # Send user and game state to user
-        await self._send_user_state(game_user)
-        await self._send_game_state(game_user, 'connect')
+        await self._send_user_state(game_user, sock=sock)
+        await self._send_game_state(game_user, 'connect', sock=sock)
 
     @game_handler.handler('admin-join')
-    async def event_admin_join(self, _):
-        await self._send_game_state(None, 'connect')
+    async def event_admin_join(self, sock):
+        await self._send_game_state(None, 'connect', sock=sock)
+
+    @game_handler.message_handler('admin-kick-user', msg.UserId)
+    async def event_kick_user(self, message: msg.UserId,
+                              ws: WebSocketServerProtocol):
+        user_id = message.user_id
+        try:
+            user = self.users[user_id]
+            log.info(f'User {user.user.name} kicked by admin')
+        except KeyError:
+            await self.room.admin_send(rerr('no-such-user'), sock=ws)
+            log.info(f'Wrong user {message.user_id} kick requested by admin')
+            return
+        del self.users[user_id]
+        broadcast_msg = msg.UserId(user_id=user_id)
+        await self.room.broadcast(rmsg('remove-user', broadcast_msg))
+        await self.room.kick(user_id)
+
+        if isinstance(self.state, HatFillState):
+            if user_id in self.state.users:
+                self.state.users.remove(user_id)
+                await self._broadcast_game_state('remove-user')
+        if (
+            isinstance(self.state, RoundState) and
+            (
+                user_id == self.state.user_from.user.user_id or
+                user_id == self.state.user_to.user.user_id
+            )
+        ):
+            await self._stop_round(reason='kicked user')
+
+    def _check_hat_full(self):
+        return (
+            isinstance(self.state, HatFillState) and
+            self.state.users and
+            not (set(self.users.keys()) - self.state.users)
+        )
+
+    @game_handler.message_handler('admin-hat-complete', msg.HatFillEnd)
+    async def msg_admin_hat_complete(self, msg: msg.HatFillEnd,
+                                     ws: WebSocketServerProtocol):
+        if not isinstance(self.state, HatFillState):
+            reply = rerr(
+                'wrong-state',
+                f'current state is {self.state}',
+            )
+            self._info(f'Admin hat end: wrong state {self.state}')
+            await self.room.admin_send(reply, ws)
+            return
+        if msg.ignore_not_full:
+            self._info('Admin requested hat fill completion, any hat state')
+            if not self.state.users:
+                self._info('Hat empty. Deny')
+                await self.room.admin_send(
+                    rerr('hat-empty', message='Hat empty'),
+                    sock=ws,
+                )
+                return
+        else:
+            self._info('Admin requested hat fill completion')
+            if not self._check_hat_full():
+                self._info('Hat not full. Deny')
+                await self.room.admin_send(
+                    rerr('hat-not-full', message='Hat not full'),
+                    sock=ws,
+                )
+                return
+
+        if len(self.users) < 2:
+            self._info(f'User count is {len(self.users)}. Deny hat fill end')
+            await self.room.admin_send(
+                rerr('users-not-enough', message='Not enough users'),
+                sock=ws,
+            )
+            return
+
+        self._info('Hat completed. Changing state')
+        await self._change_state(GameStandbyState())
 
     @game_handler.message_handler('hat-add-words', msg.HatAddWords)
     async def msg_hat_add_words(self, message: msg.HatAddWords, user: User,
@@ -301,7 +415,7 @@ class Game:
                 f'current state is {self.state}',
             )
             self._info(f'User {user.name} put words: wrong state')
-            await self.room.user_send_sock(user.user_id, ws, reply)
+            await self.room.user_send(user.user_id, reply, ws)
             return
         l_words = len(message.words)
         if l_words != self.hat_words_per_user:
@@ -310,7 +424,7 @@ class Game:
                 f'wrong words length, {self.hat_words_per_user} exp',
             )
             self._info(f'User {user.name} put words: wrong num {l_words}')
-            await self.room.user_send_sock(user.user_id, ws, reply)
+            await self.room.user_send(user.user_id, reply, ws)
             return
 
         # Put words, update state
@@ -320,14 +434,7 @@ class Game:
         self._info(f'User {user.name} put words to hat')
 
         # Broadcast
-        b_message = UserPutWords(user_id=user.user_id)
-        await self.room.broadcast(rmsg('user-put-words', b_message))
-
-        # Check if hat is full
-        if not (set(self.users.keys()) - self.state.users):
-            self._info('Hat is full. Changing state.')
-            self.state = GameStandbyState()
-            await self.room.broadcast(rmsg('game-starts', {}))
+        await self._broadcast_game_state('user-put-words')
 
     @game_handler.message_handler('admin-start-round', msg.AdminStartRound)
     async def msg_admin_start_round(self, message: msg.AdminStartRound,
@@ -339,7 +446,7 @@ class Game:
                 f'current state is {self.state}',
             )
             self._info(f'Admin start round: wrong state')
-            await self.room.admin_send_sock(ws, reply)
+            await self.room.admin_send(reply, ws)
             return
         try:
             user_from = self.users[message.user_id_from]
@@ -350,7 +457,7 @@ class Game:
                 f'wrong user provided: {err}',
             )
             self._info(f'Admin start round: wrong user id: {err}')
-            await self.room.admin_send_sock(ws, reply)
+            await self.room.admin_send(reply, ws)
             return
 
         # Prepare word and objects
@@ -360,7 +467,10 @@ class Game:
         old_state = self.state
         round_num = self.round_num + 1
         round_timer = Timer(time.time(), float(self.round_length))
-        self.state = RoundState(user_from, user_to, word, round_timer)
+        await self._change_state(
+            RoundState(user_from, user_to, word, round_timer),
+            'round-start',
+        )
         self._info(f'Admin starts round {round_num}: {user_from} -> {user_to}')
 
         try:
@@ -373,7 +483,7 @@ class Game:
                     user_to.user.name,
                 )
                 self._info(f'Answering user {user_from} is unavaiable')
-                await self.room.admin_send_sock(ws, reply)
+                await self.room.admin_send(reply, ws)
                 raise StateChangeFailed()
 
             # Update asking state
@@ -385,15 +495,11 @@ class Game:
                     user_from.user.name,
                 )
                 self._info(f'Asking user {user_from} is unavaiable')
-                await self.room.admin_send_sock(ws, reply)
+                await self.room.admin_send(reply, ws)
                 raise StateChangeFailed()
-
-            # Send broadcast message
-            await self._broadcast_game_state('round-start')
         except Exception as err:
             self._warning(f'Aborting the round {round_num}, error: {err}')
-            self.state = old_state
-            await self._broadcast_game_state()
+            await self._change_state(old_state, 'round-cancel')
             if not isinstance(err, StateChangeFailed):
                 raise
             return
@@ -401,7 +507,7 @@ class Game:
         # Start task to update state in timeout
         self.round_num = round_num
         self.state.start_ts = time.time()
-        asyncio.create_task(self.await_stop_round())
+        await asyncio.create_task(self.await_stop_round())
 
     @game_handler.message_handler('word-guessed', msg.Empty)
     async def msg_word_guessed(self, message: msg.Empty, user: User,
@@ -413,7 +519,7 @@ class Game:
                 f'current state is {self.state}',
             )
             self._info(f'User {user} word guessed: wrong state')
-            await self.room.user_send_sock(user.user_id, ws, reply)
+            await self.room.user_send(user.user_id, reply, ws)
             return
         if user.user_id != self.state.user_from.user.user_id:
             reply = rerr(
@@ -422,7 +528,7 @@ class Game:
             )
             self._info(f'User {user} word guessed: wrong user. '
                        f'Asking user is {self.state.user_from}')
-            await self.room.user_send_sock(user.user_id, ws, reply)
+            await self.room.user_send(user.user_id, reply, ws)
             return
 
         # Update user score
@@ -450,22 +556,25 @@ class Game:
             },
         )
 
-    async def await_stop_round(self):
-        await asyncio.sleep(self.round_length)
-        assert isinstance(self.state, RoundState)
-        self._info(f'Finishing the round {self.round_num}')
+    async def _stop_round(self, reason='timeout'):
+        self._info(f'Finishing the round {self.round_num}, {reason}')
         old_state = self.state
-        self.state = GameStandbyState()
+        await self._change_state(GameStandbyState(), 'round-finished')
         old_state.user_from.state = UserStateStandby()
         old_state.user_to.state = UserStateStandby()
-        await self._broadcast_game_state('round-finished')
         await self._send_user_state(old_state.user_from)
         await self._send_user_state(old_state.user_to)
         await self._save_state()
 
+    async def await_stop_round(self):
+        await asyncio.sleep(self.round_length)
+        assert isinstance(self.state, RoundState)
+        await self._stop_round()
+
     def serialize(self):
         return {
             'game_id': self.game_id,
+            'game_name': self.game_name,
             'round_length': self.round_length,
             'hat_words_per_user': self.hat_words_per_user,
             'round_num': self.round_num,
@@ -474,6 +583,23 @@ class Game:
         }
 
     async def _save_state(self):
+        self._info('Saving game state')
         state = state_serialize(self.serialize())
-        message = rmsg('state-save', msg.StateSnapshot(state=state))
-        await self.room.admin_send(message)
+        self._state_saver(state)
+
+    @classmethod
+    def load_state(cls, raw_state: str, state_saver: Callable[[str], None]):
+        state = state_deserialize(raw_state)
+        game = cls(
+            game_id=state['game_id'],
+            game_name=state['game_name'],
+            round_length=state['round_length'],
+            hat_words_per_user=state['hat_words_per_user'],
+            state_saver=state_saver,
+        )
+        game.round_num = state['round_num']
+        game.hat.deserialize(state['hat'])
+        game.users = {
+            k: GameUser.deserialize(v)
+            for k, v in state['users'].items()
+        }

@@ -1,0 +1,26 @@
+<div class="flex" *ngIf="state && userState">
+  <div class="row">
+
+    <div class="bordered">
+      <app-state [state]="state"></app-state>
+    </div>
+
+  </div>
+
+  <div class="row">
+
+    <div class="bordered half">
+      <app-users [state]="state" [admin]="false" [user]="user" [unlocked]="false"></app-users>
+    </div>
+
+    <div class="bordered half">
+      <app-hat-fill
+        *ngIf="state.state_hat_fill" [state]="state" [user]="user"
+        (sendWords)="sendHatWords($event)" [admin]="false"
+      ></app-hat-fill>
+      <app-round *ngIf="state.state_round" [state]="state"></app-round>
+      <b *ngIf="state.state_name === 'standby'">Тупим</b>
+    </div>
+
+  </div>
+</div>

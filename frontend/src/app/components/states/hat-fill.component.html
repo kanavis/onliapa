@@ -2,14 +2,34 @@
 Наполнение шляпы
 </h3>
 <table>
-  <tr *ngFor="let user of state.users">
+  <tr *ngFor="let user_ of state.users">
     <td>
-      {{user.user_name}}
+      <mark *ngIf="user && user.user_id == user_.user_id; else userNameElse">
+        <ng-container *ngTemplateOutlet="userNameElse"></ng-container>
+      </mark>
+      <ng-template #userNameElse>{{user_.user_name}}</ng-template>
     </td>
     <td>
       <b>
-        <span *ngIf="state.state_hat_fill.users.indexOf(user.user_id) === -1">тупит</span>
+        <span *ngIf="!userFilled(user_.user_id)">тупит</span>
+        <span *ngIf="userFilled(user_.user_id)">готов</span>
       </b>
     </td>
   <tr>
 </table>
+<div *ngIf="currentUserFills">
+  <h4>ВВЕДИТЕ СЛОВА:</h4>
+  <app-hat-words [number]="state.game_info.hat_words_per_user" (sendWords)="emitSendWords($event)"></app-hat-words>
+</div>
+
+<div *ngIf="admin">
+  <div class="margin-bottom">
+    <button [disabled]="!startGameAvailable" (click)="emitHatComplete()">
+      <ng-container *ngIf="startGameReady">ИГРАТЬ!</ng-container>
+      <ng-container *ngIf="!startGameReady">играть...</ng-container>
+    </button>
+  </div>
+  <div class="red" *ngIf="!userNumberValid"><small>Мало пользователей</small></div>
+  <div class="red" *ngIf="!hatHasWords"><small>Просто нет слов</small></div>
+  <div class="red" *ngIf="!hatFilled || !hatHasWords"><small>Шляпа не полна</small></div>
+</div>

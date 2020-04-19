@@ -4,7 +4,7 @@
       Игра "{{state.game_info.game_name}}"
     </b>
     <small>
-      <a target="_new" [routerLink]="">{{gameHref}}</a> &nbsp;
+      <a target="_new" [href]=gameHref>{{gameHref}}</a>&nbsp;&nbsp;
       <button (click)="toClipboard(gameHref)">Копировать</button>
     </small>
   </div>

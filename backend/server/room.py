@@ -1,14 +1,15 @@
 import logging
 from collections import defaultdict
 from itertools import chain
-from typing import Dict, Optional, Callable, Awaitable, TypeVar, Type, Any
+from typing import Dict, Optional, Callable, Awaitable, TypeVar, Type, Any, \
+    Set, Iterable, Tuple
 
 from marshmallow import ValidationError
 from websockets import WebSocketServerProtocol, ConnectionClosed
 
 from server.auth import auth, User
 from server.errors import ProtocolError, RemoteError
-from server.protocol import rerr, recv, trunc
+from server.protocol import recv, trunc, rerr
 
 log = logging.getLogger('onliapa.server.room')
 T = TypeVar('T')
@@ -31,7 +32,12 @@ class EventHandler:
         self._message_subscriptions[message] = (expect_type, callback)
 
     def message_handler(self, message: str, expect_type):
-        def decorate(outer: Callable[[Any, T, User], Awaitable[None]]):
+        def decorate(
+                outer: Callable[
+                    [Any, T, User, WebSocketServerProtocol],
+                    Awaitable[None]
+                ],
+        ):
             self.subscribe_message(message, expect_type, outer)
             return outer
 
@@ -46,7 +52,7 @@ class EventHandler:
                 f'Received message without subscription: {message}')
             return
         try:
-            parsed = callback(expect_type(**message_data))
+            parsed = expect_type(**message_data)
         except (ValueError, TypeError, ValidationError) as err:
             log.warning(f'Failed to parse {message} message: {err}')
             return
@@ -80,8 +86,8 @@ class EventEmitter:
 
 
 class GameRoom:
-    users: Dict[int, WebSocketServerProtocol]
-    admin: Optional[WebSocketServerProtocol]
+    users: Dict[int, Set[WebSocketServerProtocol]]
+    admin: Set[WebSocketServerProtocol]
     game_id: str
 
     def __init__(
@@ -91,10 +97,16 @@ class GameRoom:
             admin: Optional[WebSocketServerProtocol] = None,
     ):
         self.user_names = {}
-        self.users = {}
-        self.admin = admin
+        self.users = defaultdict(set)
+        self.admin = set()
+        if admin:
+            self.admin.add(admin)
         self.game_id = game_id
         self._emitter = emitter
+
+    @staticmethod
+    def _wsfmt(ws: WebSocketServerProtocol):
+        return ':'.join(map(str, ws.remote_address))
 
     def _info(self, message):
         log.info(f'Game {self.game_id}: {message}')
@@ -102,27 +114,13 @@ class GameRoom:
     def _debug(self, message):
         log.debug(f'Game {self.game_id}: {message}')
 
-    @staticmethod
-    async def _endup_socket(socket: WebSocketServerProtocol):
-        try:
-            await socket.send(rerr('another-connection'))
-            await socket.close()
-        except ConnectionClosed:
-            return
-
     async def serve_user(self, websocket: WebSocketServerProtocol):
         user = await auth(websocket)
         if user is None:
             return
-        try:
-            old_user = self.users[user.user_id]
-        except KeyError:
-            old_user = None
-        self.users[user.user_id] = websocket
+        self.users[user.user_id].add(websocket)
         self.user_names[user.user_id] = user.name
-        await self._emitter.emit('join', user)
-        if old_user:
-            await self._endup_socket(self.users[user.user_id])
+        await self._emitter.emit('join', (user, websocket))
         while True:
             try:
                 tag, data = await recv(websocket)
@@ -133,18 +131,15 @@ class GameRoom:
                 self._info(f'Remote error from user {user}: {err}')
                 continue
             except ConnectionClosed:
-                del self.users[user.user_id]
+                self.users[user.user_id].remove(websocket)
                 await self._emitter.emit('leave', user)
                 raise
             self._debug(f'Received message {tag} from {user}: {trunc(data)}')
             await self._emitter.emit('message', (tag, data, user, websocket))
 
     async def serve_admin(self, websocket: WebSocketServerProtocol):
-        old_admin = self.admin
-        self.admin = websocket
-        if old_admin:
-            await self._endup_socket(self.admin)
-        await self._emitter.emit('admin-join', None)
+        self.admin.add(websocket)
+        await self._emitter.emit('admin-join', websocket)
         while True:
             try:
                 tag, data = await recv(websocket)
@@ -155,12 +150,12 @@ class GameRoom:
                 self._info(f'Remote error from admin: {err}')
                 continue
             except ConnectionClosed:
-                self.admin = None
+                self.admin.remove(websocket)
                 await self._emitter.emit('admin-leave', None)
                 raise
             await self._emitter.emit(
                 'message',
-                (f'admin-{tag}', data, 'admin', websocket)
+                (f'admin-{tag}', data, None, websocket),
             )
 
     async def broadcast(self, data: str, with_admin: bool = True):
@@ -170,54 +165,81 @@ class GameRoom:
             chain(self.users.items(), (('admin', self.admin),))
             if with_admin and self.admin is not None else self.users.items()
         )
-        for user_id, sock in all_users:
-            self._debug(f'Broadcast to {self.user_names[user_id]} message {_d}')
-            if sock is not None:
+        for uid, socks in all_users:
+            user_name = 'admin' if uid == 'admin' else self.user_names[uid]
+            self._debug(f'Broadcast to {user_name} message {_d}')
+            socks_ = list(socks)
+            for sock in socks_:
                 try:
                     await sock.send(data)
                 except ConnectionClosed:
                     pass
 
-    async def user_send_sock(
+    async def _send_to_socks(
+            self,
+            dbg_info: str,
+            socks: Iterable[WebSocketServerProtocol],
+            data: str,
+    ) -> Tuple[int, Dict[str, str]]:
+        sent = {}
+        n_sent = 0
+        for _sock in socks:
+            dbg_sock = self._wsfmt(_sock)
+            try:
+                await _sock.send(data)
+                sent[dbg_sock] = 'OK'
+                n_sent += 1
+            except ConnectionClosed:
+                self._debug(f'Writing on closed {dbg_info} sock {dbg_sock}')
+                sent[dbg_sock] = 'NO'
+
+        return n_sent, sent
+
+    async def user_send(
             self,
             user_id: int,
-            sock: WebSocketServerProtocol,
-            data: str) -> bool:
+            data: str,
+            sock: Optional[WebSocketServerProtocol] = None,
+    ) -> bool:
         user_name = self.user_names[user_id]
-        self._debug(f'Sending to {user_name} message {trunc(data)}')
-        try:
-            await sock.send(data)
-        except ConnectionClosed:
-            del self.users[user_id]
-            self._info(f'User {user_id} closed connection')
-            return False
-        return True
-
-    async def user_send(self, user_id: int, data: str) -> bool:
-        if user_id in self.users:
-            sock = self.users[user_id]
-            return await self.user_send_sock(user_id, sock, data)
+        if sock:
+            socks = [sock]
+            dbg_appendix = 'specific socket'
         else:
-            user_name = self.user_names[user_id]
-            self._debug(f'Cannot send message to {user_name}: no socket')
-            return False
+            socks = self.users[user_id]
+            dbg_appendix = 'all sockets'
+        n_sent, sent = await self._send_to_socks(user_name, socks, data)
+        self._debug(
+            f'Sent to {user_name} {dbg_appendix}: {sent} '
+            f'message {trunc(data)}'
+        )
+        return bool(n_sent)
 
-    async def admin_send_sock(
-            self, sock: WebSocketServerProtocol, data: str) -> bool:
-        self._debug(f'Sending to admin message {trunc(data)}')
-        try:
-            await sock.send(data)
-        except ConnectionClosed:
-            self.admin = None
-            self._info(f'Admin closed connection')
-            return False
-        return True
-
-    async def admin_send(self, data: str) -> bool:
-        if self.admin is None:
-            return False
+    async def admin_send(
+            self,
+            data: str,
+            sock: Optional[WebSocketServerProtocol] = None,
+    ) -> bool:
+        if sock:
+            socks = [sock]
+            dbg_appendix = 'specific socket'
         else:
-            return await self.admin_send_sock(self.admin, data)
+            socks = self.admin
+            dbg_appendix = 'all sockets'
+        n_sent, sent = await self._send_to_socks('admin', socks, data)
+        self._debug(
+            f'Sent to admin {dbg_appendix}: {sent} '
+            f'message {trunc(data)}'
+        )
+        return bool(n_sent)
+
+    async def kick(self, user_id: int):
+        user = self.users[user_id]
+        log.debug(f'Kicking user {user_id}')
+        socks = list(user)
+        for sock in socks:
+            await sock.send(rerr('kick'))
+            await sock.close(1000, 'kick')
 
 
 rooms: Dict[str, GameRoom] = dict()

@@ -1,1 +1,10 @@
-aaa
+<h3>Игра <ng-container *ngIf="user"> ВЫ - {{user.user_name}}</ng-container></h3>
+
+<div *ngIf="globalError" class="red">
+  <h1 class="red">{{globalError}}</h1>
+</div>
+
+<div *ngIf="init && !globalError">
+    <app-game-auth *ngIf="!user"></app-game-auth>
+    <app-game-play *ngIf="user" [user]="user" [game_id]="gameId"></app-game-play>
+</div>

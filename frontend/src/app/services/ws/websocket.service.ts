@@ -1,9 +1,8 @@
-import { Injectable, Inject } from '@angular/core';
-import { SubscriptionLike, Observable, Observer, Subject, config, interval, Subscription } from 'rxjs';
+import { Injectable } from '@angular/core';
+import { Observable, Subject, Subscription } from 'rxjs';
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
-import { share, distinctUntilChanged, takeWhile, filter, map } from 'rxjs/operators';
-import { IWsMessage, WebSocketConfig, IWebsocketService } from './interfaces';
-import { environment } from 'src/environments/environment';
+import { filter, map } from 'rxjs/operators';
+import { IWsMessage } from './interfaces';
 
 
 @Injectable()
@@ -12,30 +11,33 @@ export class WebSocketService {
   wsSubject: Subject<IWsMessage<any>>;
   ws: WebSocketSubject<IWsMessage<any>>;
   wsSub: Subscription;
+  openSubject: Subject<Event>;
+  closeSubject: Subject<CloseEvent>;
+  connectError: Subject<Event>;
 
   constructor() {
     this.wsSubject = new Subject<IWsMessage<any>>();
+    this.openSubject = new Subject<Event>();
+    this.closeSubject = new Subject<CloseEvent>();
+    this.connectError = new Subject<any>();
   }
 
   public connect(url: string) {
     console.log(`Connecting to ws ${url}`);
-    this.ws = webSocket(url);
+    this.ws = webSocket({
+      url,
+      openObserver: this.openSubject,
+      closeObserver: this.closeSubject,
+    });
     this.wsSub = this.ws.subscribe({
       next: (message) => this.wsSubject.next(message),
-      error: (error) => this._onError(error),
-      complete: () => console.log(`websocket at ${url} complete ${this.ws.thrownError}`),
+      error: (error: Event) => {
+        console.error('Websocket', error);
+        this.connectError.next(error);
+      },
     });
-  }
-
-  public disconnect() {
-    console.log('Websocket disconnected');
-    this.wsSub.unsubscribe();
-    this.ws.complete();
-    this.ws = undefined;
-  }
-
-  private _onError(error: string) {
-    console.error('Websocket', error);
+    this.closeSubject.subscribe((e) => console.log('Websocket closed', e.code, e.reason));
+    this.openSubject.subscribe(() => console.log('Websocket connected'));
   }
 
   public send(tag: string, message: any) {

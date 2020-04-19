@@ -9,7 +9,9 @@ export class UsersComponent{
   @Input() state: IGameState;
   @Input() admin: boolean;
   @Input() unlocked: boolean;
+  @Input() user?: IUser;
   @Output() runPair = new EventEmitter<IUserPair>();
+  @Output() kickUser = new EventEmitter<number>();
 
   userNameFrom: string;
   userIdFrom: number;
@@ -52,6 +54,13 @@ export class UsersComponent{
       user_id_to: this.userIdTo,
     });
     this.resetUserId();
+  }
+
+  public emitKickUser(user: IUser) {
+    if (!confirm(`Кикаем нахер ${user.user_name}?`)) {
+      return;
+    }
+    this.kickUser.next(user.user_id);
   }
 
 }

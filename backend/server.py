@@ -9,6 +9,7 @@ from functools import partial
 import websockets
 
 from onliapa.persister.persister import Persister
+from onliapa.server import helpers as server_helpers
 from onliapa.server.server import serve
 
 log = logging.getLogger('onliapa')
@@ -19,7 +20,11 @@ parser.add_argument('-p', '--listen-port', type=int, help='port', default=6613)
 parser.add_argument('-r', '--redis-url', type=str, help='redis url',
                     default='redis://localhost')
 parser.add_argument('-d', '--debug', action='store_true')
+parser.add_argument('-f', '--forward-enable', action='store_true')
 args = parser.parse_args()
+
+# Global settings
+server_helpers.fwd_permitted = args.forward_enable
 
 # Logging
 log_level = logging.DEBUG if args.debug else logging.INFO

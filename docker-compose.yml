@@ -3,14 +3,18 @@ version: '3.1'
 services:
   backend:
     build: ./backend
-    command: python /app/server.py -l 0.0.0.0 -p 1280 -r redis://redis
+    command: python /app/server.py -l 0.0.0.0 -p 1280 -r redis://redis -f
+    depends_on:
+      - redis
     ports:
-      - '1280:1280'
+      - '127.0.0.1:1280:1280'
 
   frontend:
     build: ./frontend
     volumes:
       - /var/onliapa/frontend-build:/build
+    ports:
+      - '127.0.0.1:1281:1281'
 
   redis:
     image: redis

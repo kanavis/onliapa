@@ -9,6 +9,7 @@ from websockets import WebSocketServerProtocol, ConnectionClosed
 
 from onliapa.server.auth import auth, User
 from onliapa.server.errors import ProtocolError, RemoteError
+from onliapa.server.helpers import remote_addr
 from onliapa.server.protocol import recv, trunc, rerr
 
 log = logging.getLogger('onliapa.server.room')
@@ -106,7 +107,7 @@ class GameRoom:
 
     @staticmethod
     def _wsfmt(ws: WebSocketServerProtocol):
-        return ':'.join(map(str, ws.remote_address))
+        return remote_addr(ws)
 
     def _info(self, message):
         log.info(f'Game {self.game_id}: {message}')

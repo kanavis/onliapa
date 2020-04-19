@@ -8,6 +8,7 @@ from websockets.exceptions import ConnectionClosed
 from onliapa.game.game import Game
 from onliapa.persister import persister
 from onliapa.server.errors import ProtocolError
+from onliapa.server.helpers import remote_addr
 from onliapa.server.messages import NewGameRequest
 from onliapa.server.room import rooms
 from onliapa.server.protocol import rerr, recv_d, rmsg
@@ -38,7 +39,7 @@ async def serve_game(
     admin: bool,
     pr: persister.Persister
 ):
-    ip = ':'.join(map(str, ws.remote_address))
+    ip = remote_addr(ws)
     try:
         room = rooms[game_id]
     except KeyError:
@@ -80,7 +81,7 @@ def make_state_saver(game_id: str, pr: persister.Persister):
 
 
 async def create_game(ws: WebSocketServerProtocol, pr: persister.Persister):
-    ip = ':'.join(map(str, ws.remote_address))
+    ip = remote_addr(ws)
     request: NewGameRequest = await recv_d(ws, NewGameRequest, 'new-game')
 
     game_id = new_game_id()
@@ -113,7 +114,7 @@ async def _serve(
     ws: WebSocketServerProtocol,
     path: str
 ):
-    ip = ':'.join(map(str, ws.remote_address))
+    ip = remote_addr(ws)
     if RE_GAME_PATH.match(path):
         game_id = RE_GAME_PATH.matches.group(1)
         log.info(f'New connection from {ip} to game {game_id}')
@@ -135,18 +136,18 @@ async def serve(
     ws: WebSocketServerProtocol,
     path: str,
 ):
-    ip = ws.remote_address
+    ip = remote_addr(ws)
     try:
         await _serve(pr=pr, ws=ws, path=path)
     except ConnectionClosed as err:
-        log.info(f'Host {ip} closed the connection ({err.code})')
+        log.info(f'Connection {ip} closed ({err.code})')
     except ProtocolError as err:
-        log.info(f'Host {ip}: protocol error: {err}')
+        log.info(f'Connection {ip}: protocol error: {err}')
         try:
             await ws.send(rerr('protocol-error', 'Protocol error'))
             await ws.close(1002, f'protocol error')
         except Exception as err:
-            log.debug(f'Host {ip}: Error closing failed socket: {err}')
+            log.debug(f'Connection {ip}: Error closing failed socket: {err}')
             pass
     except Exception as err:
-        log.exception(f'Exception in handle {ws.remote_address} path {path}')
+        log.exception(f'Exception in handle {ip} path {path}')

@@ -6,6 +6,7 @@ from marshmallow import ValidationError, Schema
 from websockets import WebSocketServerProtocol
 
 from onliapa.server.errors import BaseError, ProtocolError, RemoteError
+from onliapa.server.helpers import remote_addr
 
 T = TypeVar('T')
 log = logging.getLogger('onliapa.server.protocol')
@@ -98,7 +99,7 @@ async def recv(
         trunc(data)
         log.debug(
             f'Error decoding remote packet {data}'
-            f'from {websocket.remote_address}: {err}',
+            f'from {remote_addr(websocket)}: {err}',
         )
         raise ProtocolError(err, data)
 

@@ -6,6 +6,7 @@ from websockets import WebSocketServerProtocol
 
 from onliapa.server.errors import ProtocolError
 from onliapa.server import messages as msg
+from onliapa.server.helpers import remote_addr
 from onliapa.server.protocol import recv, rerr, rmsg
 
 log = logging.getLogger('onliapa.server.auth')
@@ -40,7 +41,7 @@ class User:
 
 
 async def auth(websocket: WebSocketServerProtocol) -> Optional[User]:
-    ip = ':'.join(map(str, websocket.remote_address))
+    ip = remote_addr(websocket)
     try:
         tag, message = await recv(websocket, msg.AuthRequest)
     except ProtocolError as err:

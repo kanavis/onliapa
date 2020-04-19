@@ -1,20 +1,14 @@
-import { Observable } from 'rxjs';
+// Interfaces
 
-export interface WebSocketConfig {
-  url: string;
-  reconnectInterval?: number;
-  reconnectAttempts?: number;
+export interface IUrlConfig {
+  schema: string;
+  port: number;
+  path: string;
+  host?: string;
 }
 
 export interface IWsMessage<T> {
   tag: string;
   error?: string;
   message: T;
-}
-
-export interface IWebsocketService {
-  status: Observable<boolean>;
-  on<T>(tag: string): Observable<T>;
-  onError(): Observable<IWsMessage<null>>;
-  send(tag: string, data: any): void;
 }

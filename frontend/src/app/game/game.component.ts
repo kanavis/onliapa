@@ -20,7 +20,7 @@ export class GameComponent implements OnInit {
     this.gameId = this.route.snapshot.paramMap.get('id');
     this.ws.connectError.subscribe((error) => this.globalError =  `АШИПКА СОЕДИНЕНИЯ`);
     this.ws.onError().subscribe(this._onError.bind(this));
-    this.ws.connect(`${environment.ws_game}/${this.gameId}`);
+    this.ws.connect(environment.ws_game, this.gameId);
     this.ws.openSubject.subscribe(() => this.init = true);
     this.ws.on<IAuthUser>('auth-ok').subscribe(
       (user) => {

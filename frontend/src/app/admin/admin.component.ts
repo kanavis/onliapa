@@ -31,7 +31,7 @@ export class AdminComponent implements OnInit {
     this.gameId = this.route.snapshot.paramMap.get('id');
     this.ws.onError().subscribe(this._onError.bind(this));
     this.ws.connectError.subscribe((error) => this.globalError =  `АШИПКА СОЕДИНЕНИЯ`);
-    this.ws.connect(`${environment.ws_admin}/${this.gameId}`);
+    this.ws.connect(environment.ws_admin, this.gameId);
     // Game state
     this.ws.on<IGameState>('game-state').subscribe(this._onGameState.bind(this));
     // Remove user

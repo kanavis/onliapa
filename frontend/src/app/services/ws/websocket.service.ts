@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { Observable, Subject, Subscription } from 'rxjs';
 import { WebSocketSubject, webSocket } from 'rxjs/webSocket';
 import { filter, map } from 'rxjs/operators';
-import { IWsMessage } from './interfaces';
+import {IUrlConfig, IWsMessage} from './interfaces';
 
 
 @Injectable()
@@ -22,7 +22,13 @@ export class WebSocketService {
     this.connectError = new Subject<any>();
   }
 
-  public connect(url: string) {
+  public connect(urlConfig: IUrlConfig, subpath?: string) {
+    const host = urlConfig.host ? urlConfig.host : window.location.hostname;
+    let url = `${urlConfig.schema}${host}:${urlConfig.port}${urlConfig.path}`;
+    if (subpath) {
+      console.log('Ws subpath', subpath, urlConfig);
+      url = `${url}/${subpath}`;
+    }
     console.log(`Connecting to ws ${url}`);
     this.ws = webSocket({
       url,

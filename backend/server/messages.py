@@ -67,6 +67,7 @@ class User(NamedTuple):
     user_name: str
     user_id: int
     score: int
+    guessed_words: List[str]
 
 
 @message_type
@@ -97,6 +98,8 @@ class GameInfo(NamedTuple):
     game_name: str
     round_length: int
     hat_words_per_user: int
+    round_num: int
+    hat_words_left: int
 
 
 @message_type
@@ -122,6 +125,7 @@ class StateRound(NamedTuple):
     time_left: int
     asking: User
     answering: User
+    guessed_words: List[str]
 
 
 @message_type

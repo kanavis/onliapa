@@ -2,7 +2,7 @@ import { Component, ViewChild, ElementRef, OnInit, OnDestroy } from '@angular/co
 import { WebSocketService } from '../services/ws/websocket.service';
 import { environment } from 'src/environments/environment';
 import { INewGameRequest } from './interfaces';
-import { NavigationStart, NavigationEnd, Router } from '@angular/router';
+import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 
 @Component({

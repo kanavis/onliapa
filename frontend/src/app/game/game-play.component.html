@@ -10,7 +10,7 @@
   <div class="row">
 
     <div class="bordered half">
-      <app-users [state]="state" [admin]="false" [user]="user" [unlocked]="false"></app-users>
+      <app-users [state]="state" [admin]="false" [user]="user"></app-users>
     </div>
 
     <div class="bordered half">
@@ -18,8 +18,16 @@
         *ngIf="state.state_hat_fill" [state]="state" [user]="user"
         (sendWords)="sendHatWords($event)" [admin]="false"
       ></app-hat-fill>
-      <app-round *ngIf="state.state_round" [state]="state"></app-round>
-      <b *ngIf="state.state_name === 'standby'">Тупим</b>
+      <app-round
+        *ngIf="state.state_round"
+        [state]="state"
+        [admin]="false"
+        [stateUsersByUid]="stateUsersByUid"
+        [user]="user"
+        [userState]="userState"
+        (guess)="userGuess()"
+      ></app-round>
+      <app-standby [state]="state" *ngIf="state.state_name === 'standby'"></app-standby>
     </div>
 
   </div>

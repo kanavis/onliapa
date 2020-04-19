@@ -3,6 +3,7 @@ export interface IUser {
   user_name: string;
   user_id: number;
   score: number;
+  guessed_words: Array<string>;
 }
 
 export interface IUserId {
@@ -17,6 +18,7 @@ export interface IStateRound {
   asking: IUser;
   answering: IUser;
   time_left: number;
+  guessed_words: Array<string>;
 }
 
 export interface IGameInfo {
@@ -24,6 +26,8 @@ export interface IGameInfo {
   game_name: string;
   round_length: number;
   hat_words_per_user: number;
+  round_num: number;
+  hat_words_left: number;
 }
 
 export interface IGameState {
@@ -36,7 +40,7 @@ export interface IGameState {
   appendix: any;
 }
 
-export interface IUserPair {
+export interface IAdminStartRound {
   user_id_from: number;
   user_id_to: number;
 }

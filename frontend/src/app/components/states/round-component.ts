@@ -1,5 +1,5 @@
-import { Component, Input, OnChanges, SimpleChanges } from '@angular/core';
-import { IGameState } from 'src/app/game/interfaces';
+import {Component, EventEmitter, Input, OnChanges, Output, SimpleChanges} from '@angular/core';
+import {IGameState, IUser, IUserState} from 'src/app/game/interfaces';
 
 @Component({
   templateUrl: './round.component.html',
@@ -7,6 +7,15 @@ import { IGameState } from 'src/app/game/interfaces';
 })
 export class RoundComponent implements OnChanges {
   @Input() state: IGameState;
+  @Input() admin: boolean;
+  @Input() user?: IUser;
+  @Input() stateUsersByUid?: Map<number, IUser>;
+  @Input() userState?: IUserState;
+
+  @Output() guess = new EventEmitter<void>();
+
+  guessButtonDisabled = false;
+
   timeLeft = 0;
   timerInterval?: number;
 
@@ -29,6 +38,12 @@ export class RoundComponent implements OnChanges {
     if (this.timeLeft === 0) {
       window.clearInterval(this.timerInterval);
     }
+  }
+
+  public emitGuess() {
+    this.guessButtonDisabled = true;
+    setTimeout(() => this.guessButtonDisabled = false, 1000);
+    this.guess.emit();
   }
 
 }

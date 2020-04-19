@@ -70,9 +70,9 @@ def new_game_id() -> str:
 
 
 def make_state_saver(game_id: str, pr: persister.Persister):
-    def state_saver(state: str):
+    async def state_saver(state: str):
         try:
-            pr.save_game(game_id, state=state)
+            await pr.save_game(game_id, state=state)
             log.debug(f'Written game {game_id} state')
         except persister.CommunicationError as err:
             log.error(f'Error while saving game {game_id}: {err}')
@@ -102,8 +102,10 @@ async def load_game(game_id: str, pr: persister.Persister) -> Game:
     try:
         return Game.load_state(state, make_state_saver(game_id=game_id, pr=pr))
     except (ValueError, KeyError, TypeError) as err:
-        log.error(f'Error loading game {game_id}: {err}. Clearing')
+        cls_name = err.__class__.__name__
+        log.error(f'Error loading game {game_id}: {cls_name} {err}. Clearing')
         await pr.del_game(game_id)
+        raise persister.GameDoesNotExist()
 
 
 async def _serve(
@@ -146,5 +148,5 @@ async def serve(
         except Exception as err:
             log.debug(f'Host {ip}: Error closing failed socket: {err}')
             pass
-    except Exception:
+    except Exception as err:
         log.exception(f'Exception in handle {ws.remote_address} path {path}')

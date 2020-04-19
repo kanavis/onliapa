@@ -15,6 +15,8 @@ class CommunicationError(PersisterError):
 
 
 class Persister:
+    RECORD_TTL = 3600 * 24 * 60
+
     def __init__(self, redis_url: str):
         self.redis_url = redis_url
 
@@ -42,13 +44,13 @@ class Persister:
     async def save_game(self, key: str, state: str):
         try:
             redis = await self._redis()
-            redis.set(f'game/{key}', state)
+            await redis.setex(f'game/{key}', self.RECORD_TTL, state)
         except aioredis.errors.RedisError as err:
             raise CommunicationError(err) from err
 
     async def del_game(self, key: str):
         try:
             redis = await self._redis()
-            redis.delete(f'game/{key}')
+            await redis.delete(f'game/{key}')
         except aioredis.errors.RedisError as err:
             raise CommunicationError(err) from err

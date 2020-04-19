@@ -11,3 +11,26 @@
 <h1>
   Время: {{timeLeft}}
 </h1>
+<div *ngIf="state.state_round.guessed_words.length" class="margin-bottom">
+  <h2>Угаданные слова, {{state.state_round.guessed_words.length}} шт:</h2>
+  {{state.state_round.guessed_words.join(', ')}}
+</div>
+
+<ng-container *ngIf="!admin && userState">
+  <div *ngIf="userState.state_asking" class="red-border">
+    <div class="margin-bottom">
+      <div class="margin-bottom">
+        <h2>Вы спрашиваете!</h2>
+        <b>Отвечает: </b> {{userState.state_asking.other.user_name}}
+      </div>
+      <h1>СЛОВО: {{userState.state_asking.word}}</h1>
+    </div>
+    <button [disabled]="guessButtonDisabled" (click)="emitGuess()">Он угадал!</button>
+    <span class="red" *ngIf="guessButtonDisabled">УРА!</span>
+  </div>
+
+  <div *ngIf="userState.state_answering" class="red-border">
+    <h2>Вы отвечаете!</h2>
+    <b>Спрашивает: </b> {{userState.state_answering.other.user_name}}
+  </div>
+</ng-container>

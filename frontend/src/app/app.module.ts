@@ -16,6 +16,7 @@ import { RoundComponent } from './components/states/round-component';
 import { GameAuthComponent } from './game/game-auth.component';
 import {GamePlayComponent} from './game/game-play.component';
 import {HatWordsComponent} from './components/states/hat-words.component';
+import {StandbyComponent} from './components/states/standby.component';
 
 @NgModule({
   declarations: [
@@ -30,6 +31,7 @@ import {HatWordsComponent} from './components/states/hat-words.component';
     GameAuthComponent,
     GamePlayComponent,
     HatWordsComponent,
+    StandbyComponent,
   ],
   imports: [
     BrowserModule,

@@ -18,3 +18,12 @@
 <div class="margin">
     <b>Статус: </b>{{readableStateName}} ({{state.state_name}})
 </div>
+<div class="margin">
+  <b>Раундов сыграно: </b>{{state.game_info.round_num}}
+</div>
+<div class="margin">
+  <b>Осталось слов в шляпе: </b>{{state.game_info.hat_words_left}}
+</div>
+<div class="red" *ngIf="state.game_info.hat_words_left <= 0 && state.state_name === 'standby'">
+  Слова кончились. Всё. Пиздец.
+</div>

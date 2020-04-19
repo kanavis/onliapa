@@ -3,7 +3,7 @@ import logging
 import random
 import time
 from collections import defaultdict
-from typing import Set, Dict, Union, Optional, List, Tuple, Callable
+from typing import Set, Dict, Union, Optional, List, Tuple, Callable, Awaitable
 
 from websockets import WebSocketServerProtocol
 
@@ -34,7 +34,7 @@ class Hat:
             pass
 
     def get(self) -> str:
-        return random.choice(self._words)
+        return random.choice(list(self._words))
 
     def serialize(self):
         return {
@@ -43,6 +43,9 @@ class Hat:
 
     def deserialize(self, state: dict):
         self._words = set(state['words'])
+
+    def __len__(self):
+        return len(self._words)
 
 
 class Timer:
@@ -110,14 +113,19 @@ class GameUser:
     user: User
     score: int
     state: Union[UserStateStandby, UserStateAsking, UserStateAnswering]
+    guessed_words: List[str]
 
     def __init__(self, user):
         self.user = user
         self.state = UserStateStandby()
         self.score = 0
+        self.guessed_words = []
 
     def add_point(self):
         self.score += 1
+
+    def add_guessed_word(self, word: str):
+        self.guessed_words.append(word)
 
     def __str__(self):
         return str(self.user)
@@ -126,12 +134,14 @@ class GameUser:
         return {
             'user': self.user.serialize(),
             'score': self.score,
+            'guessed_words': self.guessed_words,
         }
 
     @classmethod
     def deserialize(cls, state: dict) -> 'GameUser':
         user = cls(user=User.deserialize(state['user']))
         user.score = state['score']
+        user.guessed_words = state['guessed_words']
         return user
 
     def to_message(self) -> msg.User:
@@ -139,6 +149,7 @@ class GameUser:
             user_name=self.user.name,
             user_id=self.user.user_id,
             score=self.score,
+            guessed_words=self.guessed_words,
         )
 
 
@@ -198,6 +209,7 @@ class RoundState(GameState):
                 asking=self.user_from.to_message(),
                 answering=self.user_to.to_message(),
                 time_left=int(self.timer.time_left),
+                guessed_words=self.guessed_words,
             ),
         }
 
@@ -224,7 +236,7 @@ class Game:
         game_name: str,
         round_length: int,
         hat_words_per_user: int,
-        state_saver: Callable[[str], None],
+        state_saver: Callable[[str], Awaitable[None]],
     ):
         self.game_id = game_id
         self.game_name = game_name
@@ -274,6 +286,8 @@ class Game:
             game_name=self.game_name,
             round_length=self.round_length,
             hat_words_per_user=self.hat_words_per_user,
+            round_num=self.round_num,
+            hat_words_left=len(self.hat),
         )
 
     def _game_state_msg(self, reason, appendix) -> str:
@@ -404,6 +418,7 @@ class Game:
 
         self._info('Hat completed. Changing state')
         await self._change_state(GameStandbyState())
+        await self._save_state()
 
     @game_handler.message_handler('hat-add-words', msg.HatAddWords)
     async def msg_hat_add_words(self, message: msg.HatAddWords, user: User,
@@ -448,6 +463,12 @@ class Game:
             self._info(f'Admin start round: wrong state')
             await self.room.admin_send(reply, ws)
             return
+        if not len(self.hat):
+            reply = rerr('hat-empty', 'hat is empty')
+            self._info(f'Admin start round: hat empty')
+            await self.room.admin_send(reply, ws)
+            return
+
         try:
             user_from = self.users[message.user_id_from]
             user_to = self.users[message.user_id_to]
@@ -534,17 +555,11 @@ class Game:
         # Update user score
         self._info(f'User {user}: user {self.state.user_to} scored')
         self.state.user_to.score += 1
+        self.state.user_to.add_guessed_word(self.state.word)
 
-        # Update word
+        # Remove word
         self.hat.remove(self.state.word)
         self.state.guessed_words.append(self.state.word)
-        self.state.word = self.hat.get()
-        self.state.user_from.state.word = self.state.word
-        await self._send_user_state(self.state.user_from)
-
-        # Check if round didn't stop. If it did - send user state again
-        if not isinstance(self.state, RoundState):
-            await self._send_user_state(self.state.user_from)
 
         # Broadcast
         msg_user_to = self.state.user_to.to_message()
@@ -555,6 +570,16 @@ class Game:
                 'word': self.state.word,
             },
         )
+
+        # Check if round didn't stop.
+        if isinstance(self.state, RoundState):
+            # Make word again
+            if len(self.hat):
+                self.state.word = self.hat.get()
+                self.state.user_from.state.word = self.state.word
+                await self._send_user_state(self.state.user_from)
+            else:
+                await self._stop_round('out-of-words')
 
     async def _stop_round(self, reason='timeout'):
         self._info(f'Finishing the round {self.round_num}, {reason}')
@@ -584,12 +609,16 @@ class Game:
 
     async def _save_state(self):
         self._info('Saving game state')
-        state = state_serialize(self.serialize())
-        self._state_saver(state)
+        raw_state = self.serialize()
+        log.debug(f'Raw state to save {raw_state}')
+        state = state_serialize(raw_state)
+        await self._state_saver(state)
 
     @classmethod
-    def load_state(cls, raw_state: str, state_saver: Callable[[str], None]):
+    def load_state(cls, raw_state: str,
+                   state_saver: Callable[[str], Awaitable[None]]):
         state = state_deserialize(raw_state)
+        log.debug(f'Loading game state {state}')
         game = cls(
             game_id=state['game_id'],
             game_name=state['game_name'],
@@ -600,6 +629,9 @@ class Game:
         game.round_num = state['round_num']
         game.hat.deserialize(state['hat'])
         game.users = {
-            k: GameUser.deserialize(v)
+            int(k): GameUser.deserialize(v)
             for k, v in state['users'].items()
         }
+        game.room.user_names = {k: v.user.name for k, v in game.users.items()}
+        game._state = GameStandbyState()
+        return game

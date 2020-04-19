@@ -1,5 +1,5 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { IUser, IUserPair, IGameState } from '../game/interfaces';
+import { IUser, IAdminStartRound, IGameState } from '../game/interfaces';
 
 @Component({
   templateUrl: './users.component.html',
@@ -8,9 +8,8 @@ import { IUser, IUserPair, IGameState } from '../game/interfaces';
 export class UsersComponent{
   @Input() state: IGameState;
   @Input() admin: boolean;
-  @Input() unlocked: boolean;
   @Input() user?: IUser;
-  @Output() runPair = new EventEmitter<IUserPair>();
+  @Output() runPair = new EventEmitter<IAdminStartRound>();
   @Output() kickUser = new EventEmitter<number>();
 
   userNameFrom: string;
@@ -19,7 +18,7 @@ export class UsersComponent{
   userIdTo: number;
 
   public get sortedUsers(): Array<IUser> {
-    return this.state.users.sort((a, b) => a.score - b.score);
+    return this.state.users.sort((a, b) => b.score - a.score);
   }
 
   public setUserFrom(user: IUser) {
@@ -61,6 +60,16 @@ export class UsersComponent{
       return;
     }
     this.kickUser.next(user.user_id);
+  }
+
+  get unlocked(): boolean {
+    return this.state.state_name === 'standby' && this.state.game_info.hat_words_left > 0;
+  }
+
+  public showUser(user: IUser) {
+    alert(`Это ${user.user_name}.
+Он угадал ${user.guessed_words.length} слов. Молодец!
+${user.guessed_words.join(', ')}`);
   }
 
 }

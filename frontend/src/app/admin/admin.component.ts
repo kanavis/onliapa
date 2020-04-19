@@ -4,14 +4,11 @@ import { WebSocketService } from '../services/ws/websocket.service';
 import { environment } from 'src/environments/environment';
 import { IWsMessage } from '../services/ws/interfaces';
 import {
-  IAuthUser,
   IGameState,
   IHatFillEnd,
-  IStateHatFill,
-  IStateRound,
   IUser,
   IUserId,
-  IUserPair
+  IAdminStartRound
 } from '../game/interfaces';
 
 
@@ -107,9 +104,9 @@ export class AdminComponent implements OnInit {
     this.init = true;
   }
 
-  runPair(pair: IUserPair) {
+  runPair(pair: IAdminStartRound) {
     console.log('Starting pair', pair);
-    
+    this.ws.send('start-round', pair);
   }
 
   kickUser(userId: number) {

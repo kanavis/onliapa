@@ -1,6 +1,6 @@
-import {Component, ElementRef, OnInit, ViewChild} from '@angular/core';
+import {Component, ElementRef, ViewChild} from '@angular/core';
 import {WebSocketService} from '../services/ws/websocket.service';
-import {IAuthRequest, IAuthUser} from './interfaces';
+import {IAuthRequest} from './interfaces';
 
 
 @Component({

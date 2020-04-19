@@ -63,5 +63,9 @@ export class GamePlayComponent implements OnInit {
     this.ws.send('hat-add-words', message);
   }
 
+  public userGuess() {
+    this.ws.send('word-guessed', {});
+  }
+
 
 }

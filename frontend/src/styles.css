@@ -122,3 +122,9 @@ div.small-form > div {
 .margin-bottom {
   margin-bottom: 10px;
 }
+
+.red-border {
+  border: 2px solid red;
+  border-radius: 5px;
+  padding: 5px;
+}

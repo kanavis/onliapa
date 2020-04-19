@@ -20,7 +20,7 @@
       <app-users
         *ngIf="state !== undefined" [state]="state"
         (runPair)="runPair($event)" (kickUser)="kickUser($event)"
-        [admin]="true" [unlocked]="state.state_name == 'standby'"></app-users>
+        [admin]="true"></app-users>
     </div>
 
     <div class="bordered half">
@@ -28,8 +28,13 @@
         *ngIf="state.state_hat_fill" [state]="state" [admin]="true"
         (hatComplete)="hatComplete($event)"
       ></app-hat-fill>
-      <app-round *ngIf="state.state_round" [state]="state"></app-round>
-      <b *ngIf="state.state_name === 'standby'">Тупим</b>
+      <app-round
+        *ngIf="state.state_round"
+        [state]="state"
+        [admin]="false"
+        [stateUsersByUid]="stateUsersByUid"
+      ></app-round>
+      <app-standby *ngIf="state.state_name === 'standby'" [state]="state"></app-standby>
     </div>
 
   </div>

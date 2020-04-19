@@ -14,7 +14,9 @@
       <mark *ngIf="user && user.user_id == user_.user_id; else userNameElse">
         <ng-container *ngTemplateOutlet="userNameElse"></ng-container>
       </mark>
-      <ng-template #userNameElse>{{user_.user_name}}</ng-template>
+      <ng-template #userNameElse>
+        <span style="cursor: pointer; user-select: none" (click)="showUser(user_)">{{user_.user_name}}</span>
+      </ng-template>
     </td>
     <td><b>{{user_.score}}</b></td>
     <td *ngIf="admin && unlocked">

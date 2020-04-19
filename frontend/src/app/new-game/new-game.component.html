@@ -1,4 +1,8 @@
-<div class="center">
+<div class="red" *ngIf="globalError">
+  {{globalError}}
+</div>
+
+<div *ngIf="!globalError" class="center">
   <section>
     <h1>
       Создать игру <span *ngIf="gameName">"{{gameName}}"</span>

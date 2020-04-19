@@ -10,6 +10,7 @@ import { Subscription } from 'rxjs';
 })
 export class NewGameComponent implements OnInit, OnDestroy {
   gameName = '';
+  globalError = '';
   roundLength = 60;
   hatWordsPerUser = 5;
   formError = '';
@@ -34,6 +35,7 @@ export class NewGameComponent implements OnInit, OnDestroy {
         alert(`Error (${error.tag}): ${error.error}`);
       }
     });
+    this.ws.connectError.subscribe(() => this.globalError = 'Ошибка соединения');
     this.ws.connect(environment.ws_create);
   }
 

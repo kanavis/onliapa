@@ -24,7 +24,6 @@ downloads/
 .eggs/
 eggs/
 .env
-env*
 env/
 .flaskenv
 htmlcov/

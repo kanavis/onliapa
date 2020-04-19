@@ -7,11 +7,11 @@ from typing import Set, Dict, Union, Optional, List, Tuple, Callable, Awaitable
 
 from websockets import WebSocketServerProtocol
 
-from game.helpers import state_serialize, state_deserialize
-from server.auth import User
-from server import messages as msg
-from server.protocol import rmsg, rerr
-from server.room import GameRoom, EventEmitter, EventHandler
+from onliapa.game.helpers import state_serialize, state_deserialize
+from onliapa.server.auth import User
+from onliapa.server import messages as msg
+from onliapa.server.protocol import rmsg, rerr
+from onliapa.server.room import GameRoom, EventEmitter, EventHandler
 
 log = logging.getLogger('onliapa.game')
 

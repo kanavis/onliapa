@@ -1,6 +1,6 @@
-from typing import NamedTuple, List, Union, Any, Optional
+from typing import NamedTuple, List, Any, Optional
 from marshmallow import Schema, fields, validate
-from server.protocol import message_type
+from onliapa.server.protocol import message_type
 
 
 @message_type

@@ -5,7 +5,7 @@ from typing import Type, Optional, Union, TypeVar, Tuple
 from marshmallow import ValidationError, Schema
 from websockets import WebSocketServerProtocol
 
-from server.errors import BaseError, ProtocolError, RemoteError
+from onliapa.server.errors import BaseError, ProtocolError, RemoteError
 
 T = TypeVar('T')
 log = logging.getLogger('onliapa.server.protocol')

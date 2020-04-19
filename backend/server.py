@@ -8,8 +8,8 @@ from functools import partial
 
 import websockets
 
-from persister.persister import Persister
-from server.server import serve
+from onliapa.persister.persister import Persister
+from onliapa.server.server import serve
 
 log = logging.getLogger('onliapa')
 

@@ -3,7 +3,7 @@
 import asyncio
 import sys
 import websockets
-from server.protocol import rmsg
+from onliapa.server.protocol import rmsg
 
 
 async def connect():

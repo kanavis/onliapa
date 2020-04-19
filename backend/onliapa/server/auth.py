@@ -4,9 +4,9 @@ from zlib import adler32
 
 from websockets import WebSocketServerProtocol
 
-from server.errors import ProtocolError
-from server import messages as msg
-from server.protocol import recv, rerr, rmsg
+from onliapa.server.errors import ProtocolError
+from onliapa.server import messages as msg
+from onliapa.server.protocol import recv, rerr, rmsg
 
 log = logging.getLogger('onliapa.server.auth')
 

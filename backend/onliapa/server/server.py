@@ -5,12 +5,12 @@ import re
 from websockets import WebSocketServerProtocol
 from websockets.exceptions import ConnectionClosed
 
-from game.game import Game
-from persister import persister
-from server.errors import ProtocolError
-from server.messages import NewGameRequest
-from server.room import rooms
-from server.protocol import rerr, recv_d, rmsg
+from onliapa.game.game import Game
+from onliapa.persister import persister
+from onliapa.server.errors import ProtocolError
+from onliapa.server.messages import NewGameRequest
+from onliapa.server.room import rooms
+from onliapa.server.protocol import rerr, recv_d, rmsg
 
 log = logging.getLogger('onliapa.server.server')
 

@@ -7,9 +7,9 @@ from typing import Dict, Optional, Callable, Awaitable, TypeVar, Type, Any, \
 from marshmallow import ValidationError
 from websockets import WebSocketServerProtocol, ConnectionClosed
 
-from server.auth import auth, User
-from server.errors import ProtocolError, RemoteError
-from server.protocol import recv, trunc, rerr
+from onliapa.server.auth import auth, User
+from onliapa.server.errors import ProtocolError, RemoteError
+from onliapa.server.protocol import recv, trunc, rerr
 
 log = logging.getLogger('onliapa.server.room')
 T = TypeVar('T')

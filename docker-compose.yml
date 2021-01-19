@@ -2,6 +2,7 @@ version: '3.1'
 
 services:
   backend:
+    restart: unless-stopped
     build: ./backend
     command: python /app/server.py -l 0.0.0.0 -p 1280 -r redis://redis -f
     depends_on:
@@ -10,6 +11,7 @@ services:
       - '127.0.0.1:1280:1280'
 
   frontend:
+    restart: unless-stopped
     build: ./frontend
     volumes:
       - /var/onliapa/frontend-build:/build
@@ -17,6 +19,7 @@ services:
       - '127.0.0.1:1281:1281'
 
   redis:
+    restart: unless-stopped
     image: redis
     volumes:
       - /var/onliapa/redis-data:/data
